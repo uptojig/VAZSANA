@@ -1,0 +1,3 @@
+# Ignore generated data file
+data.json
+__pycache__/
