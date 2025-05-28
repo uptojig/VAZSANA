@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Tarot Reader</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: linear-gradient(#123, #456);
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+#controls { margin: 20px; }
+button {
+  font-size: 18px;
+  padding: 10px 20px;
+  margin: 5px;
+  cursor: pointer;
+}
+#deck {
+  position: relative;
+  height: 60vh;
+  width: 100%;
+  margin-top: 40px;
+}
+.card {
+  width: 80px;
+  height: 120px;
+  background: #fff;
+  color: #000;
+  border-radius: 8px;
+  border: 1px solid #999;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform-origin: bottom center;
+  transition: transform 0.5s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+.card.selected {
+  box-shadow: 0 10px 15px rgba(0,0,0,0.5);
+}
+#results {
+  margin: 20px;
+  padding: 20px;
+}
+</style>
+</head>
+<body>
+  <h1>เว็บดูดวงไพ่ทาโรต์</h1>
+  <div id="controls">
+    <button id="shuffle">🔄 ตัดไพ่</button>
+    <button id="clear">🧹 ล้างไพ่</button>
+  </div>
+  <div id="deck"></div>
+  <div id="results"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const MAX_SELECT = 3; // เปลี่ยนค่านี้ได้ตามต้องการ
+  const deckEl = document.getElementById('deck');
+  const shuffleBtn = document.getElementById('shuffle');
+  const clearBtn = document.getElementById('clear');
+  const resultsEl = document.getElementById('results');
+
+  // รายชื่อไพ่ทั้ง 78 ใบ
+  const cardNames = [
+    'The Fool','The Magician','The High Priestess','The Empress','The Emperor',
+    'The Hierophant','The Lovers','The Chariot','Strength','The Hermit',
+    'Wheel of Fortune','Justice','The Hanged Man','Death','Temperance',
+    'The Devil','The Tower','The Star','The Moon','The Sun','Judgement','The World'
+  ];
+  const suits = ['Wands','Cups','Swords','Pentacles'];
+  const ranks = ['Ace','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Page','Knight','Queen','King'];
+  suits.forEach(suit => {
+    ranks.forEach(rank => {
+      cardNames.push(`${rank} of ${suit}`);
+    });
+  });
+
+  // สร้างความหมายไพ่แบบง่าย ๆ
+  const tarotMeanings = {};
+  cardNames.forEach((name, idx) => {
+    tarotMeanings[`card_${idx}`] = `ไพ่ ${name}: ความหมายของไพ่ ${name}`;
+  });
+
+  const cards = [];
+  cardNames.forEach((name, index) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.id = `card_${index}`;
+    card.textContent = name;
+    deckEl.appendChild(card);
+    cards.push(card);
+  });
+
+  let selected = [];
+
+  function layoutFan(){
+    const spread = 80; // องศาในการกางไพ่
+    cards.forEach((card, i) => {
+      const angle = -spread/2 + (i * spread / (cards.length - 1));
+      const base = `rotate(${angle}deg)`; // ยึดที่ก้นไพ่
+      card.dataset.base = base;
+      if(card.classList.contains('selected')){
+        card.style.transform = base + ' translateY(-30px)';
+      }else{
+        card.style.transform = base;
+      }
+      card.style.zIndex = i;
+    });
+  }
+
+  function shuffleDeck(){
+    cards.forEach(card => {
+      const angle = (Math.random() * 60) - 30; // -30 ถึง 30 องศา
+      const offset = (Math.random() * 60) - 30; // -30 ถึง 30px
+      const base = `translateX(${offset}px) rotate(${angle}deg)`;
+      card.dataset.base = base;
+      if(card.classList.contains('selected')){
+        card.style.transform = base + ' translateY(-30px)';
+      }else{
+        card.style.transform = base;
+      }
+      card.style.zIndex = Math.floor(Math.random()*100);
+    });
+  }
+
+  function clearDeck(){
+    selected = [];
+    resultsEl.innerHTML = '';
+    cards.forEach(card => card.classList.remove('selected'));
+    layoutFan();
+  }
+
+  function showResults(){
+    const html = selected.map(id => `<p>${tarotMeanings[id]}</p>`).join('<hr>');
+    resultsEl.innerHTML = html;
+  }
+
+  deckEl.addEventListener('click', (e) => {
+    if(!e.target.classList.contains('card')) return;
+    const card = e.target;
+    const id = card.dataset.id;
+    if(card.classList.contains('selected')){
+      card.classList.remove('selected');
+      card.style.transform = card.dataset.base;
+      selected = selected.filter(x => x !== id);
+      resultsEl.innerHTML = '';
+    }else if(selected.length < MAX_SELECT){
+      card.classList.add('selected');
+      card.style.transform = card.dataset.base + ' translateY(-30px)';
+      selected.push(id);
+      if(selected.length === MAX_SELECT){
+        showResults();
+      }
+    }
+  });
+
+  shuffleBtn.addEventListener('click', shuffleDeck);
+  clearBtn.addEventListener('click', clearDeck);
+
+  layoutFan(); // เริ่มต้นเรียงไพ่แบบพัด
+});
+</script>
+</body>
+</html>
