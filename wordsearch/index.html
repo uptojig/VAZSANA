@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Thai Word Search Generator</title>
+<style>
+  body { font-family: sans-serif; }
+  textarea { width: 100%; height: 120px; }
+  table { border-collapse: collapse; margin-top: 10px; }
+  td { border: 1px solid #555; width: 30px; height: 30px; text-align: center; cursor: pointer; user-select: none; }
+  td.found { background-color: #8f8; }
+  td.selected { background-color: #acf; }
+  .board { margin-bottom: 40px; }
+  .controls { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<h1>ตัวสร้างเกมค้นหาคำ (Thai Word Search)</h1>
+<div class="controls">
+  <label>คำ (คั่นด้วยช่องว่างหรือบรรทัดใหม่):</label><br>
+  <textarea id="wordInput"></textarea><br>
+  <label>ขนาดตาราง:</label>
+  <select id="sizeSelect">
+    <option value="10">10x10</option>
+    <option value="15" selected>15x15</option>
+    <option value="20">20x20</option>
+  </select>
+  <label>จำนวนแผ่น:</label>
+  <input type="number" id="sheetCount" min="1" max="20" value="1">
+  <br>
+  <label>ทิศทาง:</label>
+  <label><input type="checkbox" class="dir" value="0,1" checked>→</label>
+  <label><input type="checkbox" class="dir" value="0,-1" checked>←</label>
+  <label><input type="checkbox" class="dir" value="1,0" checked>↓</label>
+  <label><input type="checkbox" class="dir" value="-1,0" checked>↑</label>
+  <label><input type="checkbox" class="dir" value="1,1" checked>↘</label>
+  <label><input type="checkbox" class="dir" value="-1,1" checked>↙</label>
+  <label><input type="checkbox" class="dir" value="1,-1" checked>↗</label>
+  <label><input type="checkbox" class="dir" value="-1,-1" checked>↖</label>
+  <br>
+  <button id="generateBtn">สร้างเกม</button>
+  <button id="showBtn">ดูเฉลย</button>
+  <button id="resetBtn">รีเซ็ต</button>
+</div>
+<div id="boards"></div>
+<script>
+const defaultWords = `หลับตา
+ตากลิ้ง
+ตาน้ำ
+ไม่มีขา
+พระ
+ด้วง
+เต่า
+น้ำเต้า
+ขนหยิก
+ขนตา
+กระดิ่ง
+ดอก
+หูยาว
+สี่ร้อย
+ขนหยอย
+จิ๋วมาก
+แฝด
+สีทอง
+ตัวหอม
+ส้ม`;
+
+document.getElementById('wordInput').value = defaultWords;
+
+function splitThai(word) {
+  const chars = [];
+  const combining = /[\u0E31-\u0E4E]/;
+  for (let i=0;i<word.length;i++) {
+    const ch = word[i];
+    if (combining.test(ch) && chars.length) {
+      chars[chars.length-1] += ch;
+    } else {
+      chars.push(ch);
+    }
+  }
+  return chars;
+}
+
+function shuffle(arr) {
+  for (let i=arr.length-1;i>0;i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+}
+
+function randomLetter(pool) {
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function generateBoard(words, size, dirs) {
+  const grid = Array.from({length:size},()=>Array(size).fill(''));
+  const placements = [];
+  const lettersPool = words.join('').replace(/\s+/g,'');
+  shuffle(words);
+  for(const word of words){
+    const chars = splitThai(word);
+    let placed=false;
+    for(let attempt=0; attempt<100 && !placed; attempt++){
+      const dir = dirs[Math.floor(Math.random()*dirs.length)];
+      const dx = dir[0], dy = dir[1];
+      const maxX = dx>0 ? size-chars.length : dx<0 ? size-1 : size-chars.length;
+      const maxY = dy>0 ? size-chars.length : dy<0 ? size-1 : size-chars.length;
+      const startX = dx>=0? Math.floor(Math.random()*(maxX+1)) : Math.floor(Math.random()*(size-chars.length));
+      const startY = dy>=0? Math.floor(Math.random()*(maxY+1)) : Math.floor(Math.random()*(size-chars.length));
+      let fits=true;
+      for(let i=0;i<chars.length;i++){
+        const x=startX+i*dx, y=startY+i*dy;
+        if(x<0||y<0||x>=size||y>=size) {fits=false;break;}
+        if(grid[y][x] && grid[y][x]!==chars[i]) {fits=false;break;}
+      }
+      if(fits){
+        for(let i=0;i<chars.length;i++){
+          const x=startX+i*dx, y=startY+i*dy;
+          grid[y][x]=chars[i];
+        }
+        placements.push({word, chars, startX, startY, dx, dy, found:false});
+        placed=true;
+      }
+    }
+  }
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      if(!grid[y][x]) grid[y][x]=randomLetter(lettersPool);
+    }
+  }
+  return {grid, placements};
+}
+
+function renderBoard(boardData, container) {
+  const table=document.createElement('table');
+  table.className='board';
+  const size=boardData.grid.length;
+  for(let y=0;y<size;y++){
+    const tr=document.createElement('tr');
+    for(let x=0;x<size;x++){
+      const td=document.createElement('td');
+      td.textContent=boardData.grid[y][x];
+      td.dataset.x=x; td.dataset.y=y;
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+  container.appendChild(table);
+  boardData.element=table;
+}
+
+function clearBoards(){
+  const b=document.getElementById('boards');
+  b.innerHTML='';
+}
+
+let boards=[];
+let selecting=null;
+
+document.getElementById('generateBtn').onclick=()=>{
+  clearBoards();
+  const words=[...new Set(document.getElementById('wordInput').value.split(/\s+/).filter(w=>w))];
+  const size=parseInt(document.getElementById('sizeSelect').value,10);
+  const dirs=[];
+  document.querySelectorAll('.dir:checked').forEach(ch=>{
+    const [dx,dy]=ch.value.split(',').map(Number);
+    dirs.push([dx,dy]);
+  });
+  const count=Math.min(20,Math.max(1,parseInt(document.getElementById('sheetCount').value,10)));
+  boards=[];
+  for(let i=0;i<count;i++){
+    const bd=generateBoard([...words],size,dirs);
+    boards.push(bd);
+    renderBoard(bd,document.getElementById('boards'));
+  }
+};
+
+document.getElementById('showBtn').onclick=()=>{
+  boards.forEach(board=>{
+    board.placements.forEach(p=>{
+      for(let i=0;i<p.chars.length;i++){
+        const x=p.startX+i*p.dx, y=p.startY+i*p.dy;
+        const td=board.element.rows[y].cells[x];
+        td.classList.add('found');
+      }
+    });
+  });
+};
+
+document.getElementById('resetBtn').onclick=()=>{
+  clearBoards();
+  boards=[];
+};
+
+function cellForEvent(e){
+  const td=e.target.closest('td');
+  if(!td) return null;
+  const table=td.closest('table');
+  let board=boards.find(b=>b.element===table);
+  return {td,board};
+}
+
+document.addEventListener('mousedown',e=>{
+  const info=cellForEvent(e);
+  if(!info) return;
+  selecting={board:info.board,cells:[info.td]};
+  info.td.classList.add('selected');
+});
+
+document.addEventListener('mouseover',e=>{
+  if(!selecting) return;
+  const info=cellForEvent(e);
+  if(!info||info.board!==selecting.board) return;
+  selecting.cells.push(info.td);
+  info.td.classList.add('selected');
+});
+
+document.addEventListener('mouseup',e=>{
+  if(!selecting) return;
+  const cells=selecting.cells;
+  selecting.cells=[];
+  const board=selecting.board;
+  selecting=null;
+  const letters=cells.map(td=>td.textContent).join('');
+  const rev=letters.split('').reverse().join('');
+  let matched=null;
+  for(const p of board.placements){
+    const w=p.chars.join('');
+    if(w===letters||w===rev){ matched=p; break; }
+  }
+  document.querySelectorAll('td.selected').forEach(td=>td.classList.remove('selected'));
+  if(matched){
+    for(let i=0;i<matched.chars.length;i++){
+      const x=matched.startX+i*matched.dx, y=matched.startY+i*matched.dy;
+      const td=board.element.rows[y].cells[x];
+      td.classList.add('found');
+    }
+    matched.found=true;
+  }
+});
+</script>
+</body>
+</html>
